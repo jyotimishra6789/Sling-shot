@@ -12,6 +12,7 @@
             Render = Matter.Render,
             Runner = Matter.Runner,
             Composites = Matter.Composites,
+            Events = Matter.Events,
             Constraint = Matter.Constraint,
             MouseConstraint = Matter.MouseConstraint,
             Mouse = Matter.Mouse,
@@ -31,7 +32,7 @@
                 width: 800,
                 height: 600,
                 background: '#fafafa',
-                wireframes: false,
+                wireframes: false, // Ensures sprites are visible
                 showAngleIndicator: true
             }
         });
@@ -42,19 +43,21 @@
         var runner = Runner.create();
         Runner.run(runner, engine);
 
-        // Add ground
+        // Add ground and static bodies
         var ground = Bodies.rectangle(400, 600, 815, 50, { 
             isStatic: true, 
             render: { fillStyle: '#060a19' } 
         });
 
-        // Add a platform
-        var platform = Bodies.rectangle(500, 350, 200, 20, { 
+        var platform1 = Bodies.rectangle(610, 250, 200, 20, { 
             isStatic: true, 
             render: { fillStyle: '#060a19' } 
         });
 
-        // Create rock with sprite (Angry Bird)
+     
+
+        // Create rock with sprite
+        var rockOptions = { density: 0.004 };
         var rock = Bodies.circle(170, 450, 20, {
             render: {
                 sprite: {
@@ -65,7 +68,7 @@
             }
         });
 
-        // Add elastic constraint (slingshot effect)
+        // Add elastic constraint
         var anchor = { x: 170, y: 450 };
         var elastic = Constraint.create({ 
             pointA: anchor, 
@@ -75,8 +78,8 @@
             stiffness: 0.05
         });
 
-        // Create pyramid with more piggies
-        var pyramid = Composites.pyramid(450, 300, 6, 6, 0, 0, function(x, y) {
+        // Create first pyramid with sprite textures
+        var pyramid1 = Composites.pyramid(560, 10, 4, 5, 0, 0, function(x, y) {
             return Bodies.rectangle(x, y, 25, 40, {
                 render: {
                     sprite: {
@@ -88,8 +91,39 @@
             });
         });
 
+        // Create second pyramid with sprite textures
+        var pyramid2 = Composites.pyramid(500, 400, 5, 4, 0, 0, function(x, y) {
+            return Bodies.rectangle(x, y, 50, 40, {
+                render: {
+                    sprite: {
+                        texture: './pig.png',
+                        xScale: 0.1,
+                        yScale: 0.1
+                    }
+                }
+            });
+        });
+
         // Add all bodies to the world
-        Composite.add(engine.world, [ground, platform, pyramid, rock, elastic]);
+        Composite.add(engine.world, [ground, platform1,  pyramid1, pyramid2, rock, elastic]);
+
+        // Reset rock after release
+        Events.on(engine, 'afterUpdate', function() {
+            if (mouseConstraint.mouse.button === -1 && (rock.position.x > 190 || rock.position.y < 430)) {
+                // Create a new rock with sprite
+                rock = Bodies.circle(170, 450, 20, {
+                    render: {
+                        sprite: {
+                            texture: './angry-bird.png',
+                            xScale: 0.15,
+                            yScale: 0.15
+                        }
+                    }
+                });
+                Composite.add(engine.world, rock);
+                elastic.bodyB = rock;
+            }
+        });
 
         // Add mouse control
         var mouse = Mouse.create(render.canvas);
@@ -112,61 +146,6 @@
         Render.lookAt(render, {
             min: { x: 0, y: 0 },
             max: { x: 800, y: 600 }
-        });
-
-        // Variables for managing drag and launch mechanics
-        var initialPosition = { x: 170, y: 450 }; // Starting position of the rock
-        var isDragging = false;  // Flag to check if dragging is happening
-        var velocity = Matter.Vector.create(0, 0); // Initialize the velocity
-
-        // Mouse events for dragging and releasing
-        Matter.Events.on(mouseConstraint, 'mousedown', function(event) {
-            var body = event.body;
-            if (body === rock) {
-                // When mouse is pressed, start dragging the rock
-                isDragging = true;
-                // Position the rock to follow the mouse
-                Matter.Body.setPosition(rock, mouse.position);
-            }
-        });
-
-        Matter.Events.on(mouseConstraint, 'mousemove', function(event) {
-            if (isDragging) {
-                // Continuously update the rock's position as the mouse moves
-                Matter.Body.setPosition(rock, mouse.position);
-            }
-        });
-
-        Matter.Events.on(mouseConstraint, 'mouseup', function(event) {
-            var body = event.body;
-            if (body === rock && isDragging) {
-                // When mouse is released, calculate the velocity
-                velocity = Matter.Vector.sub(mouse.position, initialPosition);
-                velocity = Matter.Vector.mult(velocity, 0.1); // Adjust the multiplier for speed
-
-                // Set the velocity to launch the bird
-                Matter.Body.setVelocity(rock, velocity);
-
-                // Remove the elastic constraint after the shot
-                Composite.remove(world, elastic);
-                isDragging = false;
-
-                // Optional: Add a new rock after the shot
-                setTimeout(function() {
-                    // Create a new rock and reapply the elastic constraint
-                    rock = Bodies.circle(170, 450, 20, {
-                        render: {
-                            sprite: {
-                                texture: './angry-bird.png', // Ensure the image path is correct
-                                xScale: 0.15,
-                                yScale: 0.15
-                            }
-                        }
-                    });
-                    Composite.add(world, [rock, elastic]);
-                    Matter.Body.setPosition(rock, initialPosition); // Reset the position of the new rock
-                }, 1000);
-            }
         });
     </script>
 </body>
