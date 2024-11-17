@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slingshot Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+</head>
+<body>
+    <script>
+        var Engine = Matter.Engine,
+            Render = Matter.Render,
+            Runner = Matter.Runner,
+            Composites = Matter.Composites,
+            Constraint = Matter.Constraint,
+            MouseConstraint = Matter.MouseConstraint,
+            Mouse = Matter.Mouse,
+            Body = Matter.Body,
+            Composite = Matter.Composite,
+            Bodies = Matter.Bodies;
+
+        // Create engine
+        var engine = Engine.create(),
+            world = engine.world;
+
+        // Create renderer
+        var render = Render.create({
+            element: document.body,
+            engine: engine,
+            options: {
+                width: 800,
+                height: 600,
+                background: '#fafafa',
+                wireframes: false,
+                showAngleIndicator: true
+            }
+        });
+
+        Render.run(render);
+
+        // Create runner
+        var runner = Runner.create();
+        Runner.run(runner, engine);
+
+        // Add ground
+        var ground = Bodies.rectangle(400, 600, 815, 50, { 
+            isStatic: true, 
+            render: { fillStyle: '#060a19' } 
+        });
+
+        // Add a platform
+        var platform = Bodies.rectangle(500, 350, 200, 20, { 
+            isStatic: true, 
+            render: { fillStyle: '#060a19' } 
+        });
+
+        // Create rock with sprite (Angry Bird)
+        var rock = Bodies.circle(170, 450, 20, {
+            render: {
+                sprite: {
+                    texture: './angry-bird.png', // Ensure the image path is correct
+                    xScale: 0.15,
+                    yScale: 0.15
+                }
+            }
+        });
+
+        // Add elastic constraint (slingshot effect)
+        var anchor = { x: 170, y: 450 };
+        var elastic = Constraint.create({ 
+            pointA: anchor, 
+            bodyB: rock, 
+            length: 0.01,
+            damping: 0.01,
+            stiffness: 0.05
+        });
+
+        // Create pyramid with more piggies
+        var pyramid = Composites.pyramid(450, 300, 6, 6, 0, 0, function(x, y) {
+            return Bodies.rectangle(x, y, 25, 40, {
+                render: {
+                    sprite: {
+                        texture: './pig.png', // Ensure the image path is correct
+                        xScale: 0.1,
+                        yScale: 0.1
+                    }
+                }
+            });
+        });
+
+        // Add all bodies to the world
+        Composite.add(engine.world, [ground, platform, pyramid, rock, elastic]);
+
+        // Add mouse control
+        var mouse = Mouse.create(render.canvas);
+        var mouseConstraint = MouseConstraint.create(engine, {
+            mouse: mouse,
+            constraint: {
+                stiffness: 0.2,
+                render: {
+                    visible: false
+                }
+            }
+        });
+
+        Composite.add(world, mouseConstraint);
+
+        // Keep the mouse in sync with rendering
+        render.mouse = mouse;
+
+        // Fit the render viewport to the scene
+        Render.lookAt(render, {
+            min: { x: 0, y: 0 },
+            max: { x: 800, y: 600 }
+        });
+
+        // Variables for managing drag and launch mechanics
+        var initialPosition = { x: 170, y: 450 }; // Starting position of the rock
+        var isDragging = false;  // Flag to check if dragging is happening
+        var velocity = Matter.Vector.create(0, 0); // Initialize the velocity
+
+        // Mouse events for dragging and releasing
+        Matter.Events.on(mouseConstraint, 'mousedown', function(event) {
+            var body = event.body;
+            if (body === rock) {
+                // When mouse is pressed, start dragging the rock
+                isDragging = true;
+                // Position the rock to follow the mouse
+                Matter.Body.setPosition(rock, mouse.position);
+            }
+        });
+
+        Matter.Events.on(mouseConstraint, 'mousemove', function(event) {
+            if (isDragging) {
+                // Continuously update the rock's position as the mouse moves
+                Matter.Body.setPosition(rock, mouse.position);
+            }
+        });
+
+        Matter.Events.on(mouseConstraint, 'mouseup', function(event) {
+            var body = event.body;
+            if (body === rock && isDragging) {
+                // When mouse is released, calculate the velocity
+                velocity = Matter.Vector.sub(mouse.position, initialPosition);
+                velocity = Matter.Vector.mult(velocity, 0.1); // Adjust the multiplier for speed
+
+                // Set the velocity to launch the bird
+                Matter.Body.setVelocity(rock, velocity);
+
+                // Remove the elastic constraint after the shot
+                Composite.remove(world, elastic);
+                isDragging = false;
+
+                // Optional: Add a new rock after the shot
+                setTimeout(function() {
+                    // Create a new rock and reapply the elastic constraint
+                    rock = Bodies.circle(170, 450, 20, {
+                        render: {
+                            sprite: {
+                                texture: './angry-bird.png', // Ensure the image path is correct
+                                xScale: 0.15,
+                                yScale: 0.15
+                            }
+                        }
+                    });
+                    Composite.add(world, [rock, elastic]);
+                    Matter.Body.setPosition(rock, initialPosition); // Reset the position of the new rock
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
